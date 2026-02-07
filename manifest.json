@@ -2,7 +2,7 @@
   "name": "Cronos Ultra Reader",
   "short_name": "Cronos",
   "description": "Leitor de Mangás e Manhwas Offline",
-  "start_url": "./cronos.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#d4af37",
