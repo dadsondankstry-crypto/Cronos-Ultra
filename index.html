@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cronos Ultra - v1.7 Final </title>
+    
+    <link rel="manifest" href="manifest.json">
+
+    <meta name="theme-color" content="#d4af37">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <style>
+        :root { --gold: #d4af37; --bg: #0a0a0a; --glass: rgba(15, 15, 15, 0.98); --red: #ff3232; }
+        body { background: var(--bg); color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; width: 100vw; height: 100vh; }
+
+        #progress-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #222; z-index: 10000; display: none; }
+        #progress-bar { height: 100%; background: #00aaff; width: 0%; transition: width 0.2s; }
+        #progress-text { position: fixed; top: 10px; right: 10px; font-size: 12px; font-weight: bold; color: #000; background: var(--gold); padding: 4px 8px; border-radius: 4px; z-index: 10001; display: none; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+
+        #toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.95); color: var(--gold); padding: 15px 25px; border: 1px solid var(--gold); border-radius: 8px; z-index: 9000; font-weight: bold; text-align: center; display: none; pointer-events: none; box-shadow: 0 0 25px rgba(212, 175, 55, 0.4); }
+
+        #nav { position: fixed; top: 0; width: 100%; background: var(--glass); padding: 10px 0; z-index: 1000; border-bottom: 1px solid #222; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.8); transition: transform 0.3s ease; }
+        
+        body.cinema-mode #nav { transform: translateY(-150%); }
+        body.cinema-mode #status-bar { transform: translateY(150%); }
+        body.cinema-mode #viewer { margin-top: 0; background: #000; scrollbar-width: none; }
+        body.cinema-mode #viewer::-webkit-scrollbar { display: none; }
+        body.cinema-mode .home-card { display: none !important; }
+
+        .row { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 0 10px; box-sizing: border-box; }
+        #urlInput { flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #333; background: #111; color: #fff; outline: none; font-size: 16px; }
+        #urlInput:focus { border-color: var(--gold); }
+        
+        .btn-nav { flex: 1; padding: 15px 0; border: 1px solid #333; border-radius: 10px; cursor: pointer; background: #1a1a1a; color: var(--gold); font-weight: bold; font-size: 14px; text-transform: uppercase; transition: 0.2s; display: flex; justify-content: center; align-items: center; }
+        .btn-search { background: var(--gold); color: #000; width: 60px; flex: none; font-size: 20px; border: none; border-radius: 10px; }
+
+        #viewer { margin-top: 70px; padding-bottom: 40px; height: 160vh; text-align: center; transition: margin 0.3s; position: relative; overflow-y: scroll; overflow-x: hidden; touch-action: pan-y; }
+        #zoom-container { transform-origin: 0 0; will-change: transform; min-height: 100%; }
+        .page-img { max-width: 100%; height: auto; display: block; margin: 0 auto; user-select: none; pointer-events: none; }
+        body.mode-manhwa .page-img { width: 100%; margin-bottom: 0; display: block; }
+        body.mode-manga .page-img { display: none; height: 100vh; object-fit: contain; width: 100%; }
+        body.mode-manga .page-img.active { display: block; }
+
+        #status-bar { position: fixed; bottom: 0; width: 100%; background: #000; color: var(--gold); text-align: center; font-size: 11px; padding: 4px; z-index: 1000; border-top: 1px solid #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: transform 0.3s ease; }
+
+        .home-card { display: none; width: 350px; height: 520px; margin: 40px auto; background: #000; border: 4px solid var(--gold); border-radius: 12px; box-shadow: 0 0 40px rgba(212, 175, 55, 0.2); position: relative; z-index: 2000; overflow: hidden; flex-direction: column; cursor: pointer; }
+        .card-header { background: var(--gold); color: #000; padding: 5px; text-align: center; font-weight: bold; font-size: 12px; flex: none; }
+        .card-content { flex: 1; background: #111; position: relative; overflow: hidden; pointer-events: none; }
+        .cover-preview { width: 100%; height: 100%; object-fit: contain; background: #000; opacity: 0.9; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-content { background: #121212; padding: 20px; border-radius: 12px; border: 1px solid var(--gold); width: 85%; max-width: 320px; max-height: 80vh; overflow-y: auto; }
+        .modal-content h3 { color: var(--gold); margin: 0 0 15px 0; border-bottom: 1px solid #333; padding-bottom: 10px; text-align: center; }
+
+        .menu-btn { width: 100%; padding: 12px; margin-bottom: 8px; background: #1f1f1f; color: #fff; border: 1px solid #333; border-radius: 6px; text-align: left; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .menu-btn:hover { border-color: var(--gold); color: var(--gold); }
+        .list-item { display: flex; justify-content: space-between; align-items: center; background: #1f1f1f; margin-bottom: 5px; padding: 10px; border-radius: 4px; border: 1px solid #333; }
+        .list-text { color: #fff; cursor: pointer; flex: 1; font-size: 13px; font-weight: 500; }
+        .btn-del { border: none; background: transparent; color: var(--red); font-weight: bold; padding: 5px 10px; cursor: pointer; font-size: 16px; }
+
+        #manga-pages-container { display: none; }
+        #pageCounter { display: none; position: fixed; bottom: 30px; right: 10px; background: rgba(0,0,0,0.7); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 1500; }
+
+        body.cinema-mode #manga-pages-container { display: block !important; }
+        body.cinema-mode #pageCounter { display: block !important; }
+    </style>
+</head>
+<body onload="initDB()" class="mode-manhwa">
+
+    <div id="toast"></div>
+    <div id="progress-wrapper"><div id="progress-bar"></div></div>
+    <div id="progress-text">0%</div>
+
+    <div id="nav">
+        <div class="row">
+            <input type="text" id="urlInput" placeholder="Ex: Solo Leveling 01..." onkeypress="handleEnter(event)">
+            <button onclick="buscar()" class="btn-nav btn-search">🔍</button>
+        </div>
+        <div class="row">
+            <button class="btn-nav" onclick="mudarCapitulo(-1)">❮</button>
+            <button class="btn-nav" onclick="mudarCapitulo(1)">❯</button>
+            <button class="btn-nav" onclick="abrirModal('modal-menu')">OPÇÕES ☰</button>
+        </div>
+    </div>
+
+<div id="viewer" onclick="handleReaderClick(event)">
+    <div id="zoom-container">
+        <br><br>
+        <div class="home-card" id="reader-window" onclick="ativarModoCinema(event)">
+            <div class="card-header">CLIQUE PARA LER</div>
+            <div class="card-content" id="preview-content"></div>
+        </div>
+        <div id="manga-pages-container"></div>			
+        
+        <h2 id="home-title" style="color:var(--gold); margin-top:100px">CRONOS ULTRA</h2>
+        <p id="home-subtitle" style="color:#666; font-size:12px">v1.7 - Final </p>
+        
+    </div>
+</div>
+    
+    <div id="pageCounter">Pág. 0 / 0</div>
+    <div id="status-bar">AGUARDANDO COMANDO</div>
+
+<div id="modal-menu" class="modal" onclick="fecharModalExterno(event)">
+    <div class="modal-content">
+        <h3>⚙ MENU DE OPÇÕES</h3>
+        <button class="menu-btn" onclick="fecharModal(); renderRecentes(); abrirModal('modal-recentes');">1. Recentes <span>🕒</span></button>
+        <button class="menu-btn" onclick="favoritar()">2. Adicionar Favorito <span>❤️</span></button>
+        <button class="menu-btn" onclick="fecharModal(); renderFavs(); abrirModal('modal-favs');">3. Lista de Favoritos <span>⭐</span></button>
+        <button class="menu-btn" onclick="salvarOffline()">4. Adicionar Offline <span>💾</span></button>
+        <button class="menu-btn" onclick="fecharModal(); renderOffline(); abrirModal('modal-off');">5. Lista de Offline <span>📂</span></button>
+        <button class="menu-btn" onclick="baixarZip()">6. Download ZIP <span>📦</span></button>
+        <button class="menu-btn" onclick="fecharModal(); abrirModal('modal-config')">7. Configurações <span>⚙️</span></button>
+        <hr style="border-color:#333">
+        <button class="menu-btn" style="text-align:center; display:block" onclick="fecharModal()">FECHAR</button>
+    </div>
+</div>
+<div id="modal-config" class="modal" onclick="fecharModalExterno(event)">
+    <div class="modal-content">
+        <h3>⚙ CONFIGURAÇÕES</h3>
+        <button class="menu-btn" onclick="fecharModal(); abrirModal('modal-src')">Escolher Fonte <span>📡</span></button>
+        <button class="menu-btn" onclick="toggleMode()" id="modeBtnTextConfig">Modo: Manhwa (Scroll) <span>📜</span></button>
+        <button class="menu-btn" onclick="ativarModoCinema()">Modo Cinema <span>⛶</span></button>
+        <button class="menu-btn" onclick="fecharModal(); renderUpdates(); abrirModal('modal-updates')" style="background: #1e3a8a;">Verificar Atualizações <span>🔄</span></button>
+        
+        <hr style="border-color:#333">
+		<button class="menu-btn" onclick="exportarDados()" style="background: #27ae60; color: #fff;">Exportar Backup <span>📥</span></button>
+		<button class="menu-btn" onclick="importarDados()" style="background: #8e44ad; color: #fff;">Importar Backup <span>📤</span></button>
+        
+        <hr style="border-color:#333">
+        <button class="menu-btn" style="color:var(--red)" onclick="fecharModal(); abrirModal('modal-confirm-reset')">Resetar Aplicativo <span>🗑</span></button>
+        <br>
+        <button class="menu-btn" style="text-align:center; display:block" onclick="fecharModal(); abrirModal('modal-menu');">VOLTAR</button>
+    </div>
+</div>
+<div id="modal-lista-caps" class="modal" onclick="fecharModalExterno(event)">
+    <div class="modal-content">
+        <h3 id="titulo-lista-caps">CAPÍTULOS</h3>
+        <div id="corpo-lista-caps" class="list-container" style="max-height: 400px; overflow-y: auto;">
+            </div>
+        <br>
+        <button class="menu-btn" style="text-align:center; display:block" onclick="fecharModal(); abrirModal('modal-updates');">VOLTAR</button>
+    </div>
+</div>
+<div id="modal-updates" class="modal" onclick="fecharModalExterno(event)">
+    <div class="modal-content">
+        <h3>🔍 BUSCAR NOVOS CAPÍTULOS</h3>
+        <button class="menu-btn" onclick="atualizarTodosSequencial()" style="background: #2ecc71; color: #000; font-weight: bold; text-align: center; display: block; border: none; margin-bottom: 15px;">🔄 ATUALIZAR TODOS (FILA)</button>
+        
+        <p style="font-size:10px; color:#888; margin-bottom:10px">O sistema verificará um mangá por vez, parando no primeiro capítulo não encontrado.</p>
+        <div id="lista-updates" class="list-container"></div>
+        <br>
+        <button class="menu-btn" style="text-align:center; display:block" onclick="fecharModal(); abrirModal('modal-config');">VOLTAR</button>
+    </div>
+</div>
+    <div id="modal-src" class="modal" onclick="fecharModalExterno(event)">
+        <div class="modal-content">
+            <h3>📡 ESCOLHER FONTE</h3>
+            <button class="menu-btn" onclick="setEngine('AUTO (Testar Todas)', -1)" style="background: var(--gold); color: #000; font-weight: bold;">⚡ MODO AUTOMÁTICO</button>
+            <hr style="border-color:#444">
+            <button class="menu-btn" onclick="setEngine('Mugiwaras (Padrão)', 0)">1. Mugiwaras (Cap. 1) 📡</button>
+            <button class="menu-btn" onclick="setEngine('Mugiwaras (Zero)', 1)">2. Mugiwaras (Cap. 01) 📡</button>
+            <button class="menu-btn" onclick="setEngine('Mugiwaras (Manga-)', 2)">3. Mugiwaras (Manga-Nome) 📡</button>
+            <button class="menu-btn" onclick="setEngine('MangaLivre (Padrão)', 3)">4. MangaLivre (Cap. 1) 📡</button>
+            <button class="menu-btn" onclick="setEngine('MangaLivre (Zero)', 4)">5. MangaLivre (Cap. 01) 📡</button>
+            <hr style="border-color:#333">
+            <button class="menu-btn" onclick="fecharModal(); abrirModal('modal-menu');">VOLTAR</button>
+        </div>
+    </div>
+
+    <div id="modal-recentes" class="modal" onclick="fecharModalExterno(event)"><div class="modal-content"><h3>🕒 RECENTES</h3><div id="lista-recentes"></div><br><button class="menu-btn" onclick="fecharModal(); abrirModal('modal-menu');">VOLTAR</button></div></div>
+    <div id="modal-favs" class="modal" onclick="fecharModalExterno(event)"><div class="modal-content"><h3>⭐ FAVORITOS</h3><div id="lista-favs"></div><br><button class="menu-btn" onclick="fecharModal(); abrirModal('modal-menu');">VOLTAR</button></div></div>
+    <div id="modal-off" class="modal" onclick="fecharModalExterno(event)"><div class="modal-content"><h3>📂 OFFLINE</h3><div id="lista-off"></div><br><button class="menu-btn" onclick="fecharModal(); abrirModal('modal-menu');">VOLTAR</button></div></div>
+<div id="modal-alert" class="modal" onclick="fecharModalExterno(event)" style="z-index: 11000;">
+    <div class="modal-content" style="text-align: center; border-color: var(--gold);">
+        <h3 id="alert-title">AVISO</h3>
+        <p id="alert-message" style="font-size: 14px; margin: 20px 0; color: #fff;"></p>
+        <button class="menu-btn" style="text-align:center; display:block; background: var(--gold); color: #000;" onclick="fecharModal();">ENTENDIDO</button>
+    </div>
+</div>
+<div id="modal-confirm-reset" class="modal" onclick="fecharModalExterno(event)">
+    <div class="modal-content" style="text-align: center;">
+        <h3 style="color: var(--red);">⚠️ ATENÇÃO</h3>
+        <p>Isso apagará todos os favoritos, históricos e dados offline. Deseja continuar?</p>
+        <div style="display: flex; gap: 10px;">
+            <button class="menu-btn" style="background: var(--red); color: #fff;" onclick="localStorage.clear(); location.reload();">SIM, RESETAR</button>
+            <button class="menu-btn" onclick="fecharModal()">CANCELAR</button>
+        </div>
+    </div>
+</div>
+
+    <script>
+        // REGISTRO DO SERVICE WORKER PARA PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('PWA: Cronos Ultra Ativo'))
+                    .catch(err => console.log('PWA: Erro no registro', err));
+            });
+        }
+
+        const PROXY = "https://fragrant-unit-a421.dadsondankstry.workers.dev/?url=";
+        let imagensAtuais = [], tituloAtual = "Manga", engineSelecionada = -1, db, urlAtual = "";
+        let cacheData = JSON.parse(localStorage.getItem('readerCache') || '{}');
+        let isManhwaMode = localStorage.getItem('cronos_mode') !== 'manga';
+
+        let scale = 1, lastScale = 1, posX = 0, posY = 0, initialDistance = 0, isDragging = false;
+        let startX = 0, startY = 0, centerX = 0, centerY = 0;
+        let currentPage = 0, totalPages = 0;
+
+        const reader = document.getElementById('viewer'); 
+        const container = document.getElementById('zoom-container');
+
+        function initDB() {
+            const req = indexedDB.open("CronosPremiumDB", 2);
+            req.onupgradeneeded = e => { if(!e.target.result.objectStoreNames.contains("mangas")) e.target.result.createObjectStore("mangas", { keyPath: "id" }); };
+            req.onsuccess = e => { db = e.target.result; };
+            updateModeButton();
+            updateTouchAction();
+        }
+
+        function applyTransform() { container.style.transform = `translate3d(${posX}px, ${posY}px, 0px) scale(${scale})`; }
+        function resetZoom() { scale = 1; lastScale = 1; posX = 0; posY = 0; applyTransform(); }
+        function updateTouchAction() { reader.style.touchAction = (scale <= 1.05) ? "pan-y" : "none"; }
+
+        reader.addEventListener('touchstart', e => {
+            if (e.touches.length === 2) {
+                initialDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                lastScale = scale;
+                centerX = (e.touches[0].pageX + e.touches[1].pageX) / 2;
+                centerY = (e.touches[0].pageY + e.touches[1].pageY) / 2 + (isManhwaMode ? reader.scrollTop : 0);
+            } else if (e.touches.length === 1) {
+                isDragging = true;
+                startX = e.touches[0].pageX - posX;
+                startY = e.touches[0].pageY - posY;
+            }
+        }, { passive: false });
+
+        reader.addEventListener('touchmove', e => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                if (initialDistance > 0) {
+                    const newScale = Math.min(Math.max(1, (dist / initialDistance) * lastScale), 4);
+                    const deltaScale = newScale - scale;
+                    posX -= (centerX - posX) * (deltaScale / scale);
+                    posY -= (centerY - posY) * (deltaScale / scale);
+                    scale = newScale;
+                    applyTransform();
+                    updateTouchAction();
+                }
+            } else if (isDragging && scale > 1.05) {
+                e.preventDefault();
+                posX = e.touches[0].pageX - startX;
+                posY = e.touches[0].pageY - startY;
+                applyTransform();
+            }
+        }, { passive: false });
+
+        reader.addEventListener('touchend', () => { 
+            isDragging = false; 
+            if (scale <= 1.05) resetZoom(); 
+            updateTouchAction(); 
+        });
+
+        function setEngine(nome, indice) { engineSelecionada = indice; updateStatus(((indice === -1) ? "MODO: " : "FONTE: ") + nome, true); fecharModal(); }
+
+        function gerarLinks(input) {
+            const partes = input.trim().split(/\s+/);
+            let nomeManga, capInt;
+            const ultimaPalavra = partes[partes.length - 1];
+            if (!isNaN(ultimaPalavra) && partes.length > 1) {
+                const capituloRaw = partes.pop();
+                nomeManga = partes.join(' ');
+                capInt = parseInt(capituloRaw);
+            } else { nomeManga = input; capInt = 1; }
+            const nomeBase = limparNome(nomeManga);
+            const capSemZero = capInt.toString(); 
+            const capComZero = capInt < 10 ? '0' + capInt : capInt.toString();
+            return [
+                `https://mugiwarasoficial.com/manga/${nomeBase}/capitulo-${capSemZero}`,
+                `https://mugiwarasoficial.com/manga/${nomeBase}/capitulo-${capComZero}`,
+                `https://mugiwarasoficial.com/manga/manga-${nomeBase}/capitulo-${capSemZero}`,
+                `https://mangalivre.to/manga/${nomeBase}/capitulo-${capSemZero}`,
+                `https://mangalivre.to/manga/${nomeBase}/capitulo-${capComZero}`
+            ];
+        }
+
+        async function buscar(urlManual) {
+            let rawInput = urlManual || document.getElementById('urlInput').value;
+            if (!rawInput) return;
+            document.getElementById('urlInput').value = rawInput;
+            if (window.innerWidth < 768) document.activeElement.blur();
+
+            if (rawInput.trim().toLowerCase().startsWith('http')) {
+                updateStatus("🔗 CARREGANDO...", true);
+                if (await carregarURL(rawInput)) { urlAtual = rawInput; return; }
+            }
+
+            const links = gerarLinks(rawInput);
+            const indices = (engineSelecionada === -1) ? [0, 1, 2, 3, 4] : [engineSelecionada];
+            document.getElementById('status-bar').style.color = "#f1c40f";
+
+            for (let i of indices) {
+                updateStatus(`🔎 TESTANDO FONTE ${i + 1}...`, true);
+                if (await carregarURL(links[i])) {
+                    urlAtual = links[i];
+                    document.getElementById('urlInput').value = links[i];
+                    document.getElementById('status-bar').style.color = "#2ecc71";
+                    updateStatus("✅ ENCONTRADO!", true);
+                    return;
+                }
+            }
+            updateStatus("❌ NÃO ENCONTRADO", true);
+            document.getElementById('status-bar').style.color = "#e74c3c";
+        }
+
+        async function carregarURL(url, isSilent = false) {
+            if(cacheData[url]) {
+                if(!isSilent) { 
+                    imagensAtuais = cacheData[url]; 
+                    tituloAtual = localStorage.getItem('t_'+url) || "Manga"; 
+                    renderizar(); 
+                    salvarNoHistorico(url, tituloAtual);
+                }
+                return true;
+            }
+            try {
+                const res = await fetch(PROXY + encodeURIComponent(url));
+                const html = await res.text();
+                const doc = new DOMParser().parseFromString(html, "text/html");
+                const imgs = Array.from(doc.querySelectorAll('img')).map(i => i.getAttribute('data-src') || i.getAttribute('src')).filter(s => s && s.includes('http') && !/logo|banner|discord|acesse|zap|removebg|75x106.webp|perfil/i.test(s));
+                
+                if(imgs.length > 3) {
+                    cacheData[url] = imgs; 
+                    localStorage.setItem('readerCache', JSON.stringify(cacheData));
+                    const tit = doc.title.split('|')[0].trim().split(' - Cap')[0];
+                    localStorage.setItem('t_' + url, tit);
+                    
+                    if(!isSilent) { 
+                        imagensAtuais = imgs; 
+                        tituloAtual = tit; 
+                        renderizar(); 
+                        salvarNoHistorico(url, tit);
+                    }
+                    return true;
+                }
+            } catch(e) {}
+            return false;
+        }
+
+        function renderizar() {
+            document.getElementById('home-title').style.display = 'none';
+            document.getElementById('home-subtitle').style.display = 'none';
+            document.getElementById('reader-window').style.display = 'flex';
+            document.getElementById('preview-content').innerHTML = `<img src="${imagensAtuais[0]}" class="cover-preview">`;
+            document.getElementById('manga-pages-container').innerHTML = imagensAtuais.map(src => `<img src="${src}" class="page-img" loading="lazy">`).join('');
+            totalPages = imagensAtuais.length;
+            document.body.className = isManhwaMode ? "mode-manhwa" : "mode-manga";
+            updateStatus("📖 TOQUE NA JANELA PARA LER");
+            fecharModal();
+        }
+
+        function proximoCapitulo() {
+            let url = urlAtual || document.getElementById('urlInput').value;
+            let match = url.match(/(.*?capitulo-)(\d+)(\/*|)$/);
+            if (match) {
+                let novoNum = parseInt(match[2]) + 1;
+                let finalNum = (match[2].startsWith('0') && novoNum < 10) ? '0' + novoNum : novoNum;
+                buscar(match[1] + finalNum + match[3]);
+            } else { mudarCapitulo(1); }
+        }
+
+        function mudarCapitulo(dir) {
+            if(dir === 1) proximoCapitulo();
+            else {
+                let input = document.getElementById('urlInput');
+                input.value = input.value.replace(/(\d+)(\/*|)$/, (m, n, s) => (Math.max(1, parseInt(n) - 1)) + s);
+                buscar();
+            }
+        }
+
+        function toggleMode() {
+            isManhwaMode = !isManhwaMode;
+            localStorage.setItem('cronos_mode', isManhwaMode ? 'manhwa' : 'manga');
+            updateModeButton();
+            document.body.className = isManhwaMode ? "mode-manhwa" : "mode-manga";
+            if(document.body.classList.contains('cinema-mode')) irParaPagina(currentPage);
+        }
+
+        function updateModeButton() {
+            const texto = isManhwaMode ? "Modo: Manhwa (Scroll) <span>📜</span>" : "Modo: Mangá (Páginas) <span>📖</span>";
+            if(document.getElementById('modeBtnTextConfig')) document.getElementById('modeBtnTextConfig').innerHTML = texto;
+        }
+
+        function irParaPagina(n) {
+            const pages = document.querySelectorAll('.page-img');
+            if (!pages.length) return;
+            currentPage = Math.max(0, Math.min(n, pages.length - 1));
+            if (!isManhwaMode) {
+                pages.forEach(p => p.classList.remove('active'));
+                pages[currentPage].classList.add('active');
+                document.getElementById('viewer').scrollTop = 0;
+            }
+            document.getElementById('pageCounter').innerText = `Pág. ${currentPage + 1} / ${pages.length}`;
+        }
+
+        function handleReaderClick(e) {
+            if (isManhwaMode || scale > 1.05 || e.target.closest('.home-card')) return;
+            if (e.clientX > window.innerWidth * 0.7) irParaPagina(currentPage + 1);
+            else if (e.clientX < window.innerWidth * 0.3) irParaPagina(currentPage - 1);
+        }
+
+        function ativarModoCinema() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+            document.body.classList.add('cinema-mode');
+            irParaPagina(0); resetZoom(); showToast("MODO LEITURA ATIVO");
+        }
+
+        document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('cinema-mode'); });
+
+        function showToast(m) { const t = document.getElementById('toast'); t.innerText = m; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+        function updateStatus(t, toast = false) { document.getElementById('status-bar').innerText = t; if(toast) showToast(t); }
+        function limparNome(t) { return t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-'); }
+        function handleEnter(e) { if(e.key === "Enter") buscar(); }
+        function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function fecharModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
+        function fecharModalExterno(e) { if(e.target.className === 'modal') fecharModal(); }
+
+        function favoritar() {
+            let f = JSON.parse(localStorage.getItem('favs_cronos') || '[]');
+            let u = document.getElementById('urlInput').value;
+            if(!u) return;
+            let capMatch = u.match(/capitulo-(\d+)/);
+            let nomeCompleto = tituloAtual;
+            if (capMatch) nomeCompleto = tituloAtual.split(' - Cap')[0] + " - Cap " + capMatch[1];
+            if(!f.find(x => x.u === u)) { 
+                f.push({ t: nomeCompleto, u: u }); 
+                localStorage.setItem('favs_cronos', JSON.stringify(f)); 
+                updateStatus("⭐ FAVORITO ADICIONADO: " + nomeCompleto, true); 
+            } else { updateStatus("📢 JÁ ESTÁ NOS FAVORITOS", true); }
+        }
+
+        function renderFavs() { const f = JSON.parse(localStorage.getItem('favs_cronos') || '[]'); document.getElementById('lista-favs').innerHTML = f.length ? f.map(i => `<div class="list-item"><span class="list-text" onclick="buscar('${i.u}');fecharModal();">⭐ ${i.t}</span><button class="btn-del" onclick="removerFav('${i.u}')">✕</button></div>`).join('') : '<p>Vazio</p>'; }
+        function removerFav(u) { localStorage.setItem('favs_cronos', JSON.stringify(JSON.parse(localStorage.getItem('favs_cronos')).filter(x => x.u !== u))); renderFavs(); }
+        
+        function salvarNoHistorico(url, titulo) {
+            let h = JSON.parse(localStorage.getItem('cronos_recentes') || '[]');
+            let nomeObra = titulo.split(' - Cap')[0];
+            let capMatch = url.match(/capitulo-(\d+)/);
+            let tituloComCap = capMatch ? nomeObra + " - Cap " + capMatch[1] : titulo;
+            h = h.filter(i => i.t.split(' - Cap')[0] !== nomeObra);
+            h.unshift({ u: url, t: tituloComCap });
+            if(h.length > 15) h.pop();
+            localStorage.setItem('cronos_recentes', JSON.stringify(h));
+        }
+
+        function renderRecentes() {
+            const h = JSON.parse(localStorage.getItem('cronos_recentes') || '[]');
+            const lista = document.getElementById('lista-recentes');
+            if(!lista) return;
+            lista.innerHTML = h.length ? h.map(i => `<div class="list-item"><span class="list-text" onclick="buscar('${i.u}'); fecharModal();">🕒 ${i.t}</span><button class="btn-del" onclick="removerRecente('${i.u}')">✕</button></div>`).join('') : '<p style="text-align:center">Histórico vazio</p>';
+        }
+
+        function removerRecente(u) { let h = JSON.parse(localStorage.getItem('cronos_recentes') || '[]').filter(i => i.u !== u); localStorage.setItem('cronos_recentes', JSON.stringify(h)); renderRecentes(); }
+
+        async function baixarZip() {
+            if(!imagensAtuais.length) { updateStatus("⚠️ NADA PARA BAIXAR", true); return; }
+            let urlReferencia = document.getElementById('urlInput').value;
+            let capMatch = urlReferencia.match(/capitulo-(\d+)/);
+            let nomeArquivo = tituloAtual.split(' - Cap')[0];
+            nomeArquivo += capMatch ? " - Cap " + capMatch[1] : " - Completo";
+            updateStatus("📦 GERANDO ZIP: " + nomeArquivo, true);
+            document.getElementById('progress-wrapper').style.display = 'block';
+            document.getElementById('progress-text').style.display = 'block';
+            const zip = new JSZip();
+            const folder = zip.folder(nomeArquivo);
+            for(let i=0; i < imagensAtuais.length; i++) {
+                try {
+                    const r = await fetch(PROXY + encodeURIComponent(imagensAtuais[i]));
+                    if (!r.ok) throw new Error();
+                    const blob = await r.blob();
+                    let numeroPagina = (i + 1).toString().padStart(3, '0');
+                    folder.file(`pagina_${numeroPagina}.jpg`, blob);
+                    updateProgress(i + 1, imagensAtuais.length);
+                } catch(e) { console.error("Erro ao baixar imagem " + i); }
+            }
+            zip.generateAsync({type:"blob"}).then(function(content) {
+                saveAs(content, `${nomeArquivo}.zip`);
+                updateStatus("✅ DOWNLOAD CONCLUÍDO!", true);
+                setTimeout(() => {
+                    document.getElementById('progress-wrapper').style.display = 'none';
+                    document.getElementById('progress-text').style.display = 'none';
+                }, 2000);
+            });
+        }
+
+        function updateProgress(a, t) { 
+            let b = document.getElementById('progress-bar'), txt = document.getElementById('progress-text');
+            let p = Math.round((a/t)*100); b.style.width = p+"%"; txt.innerText = p+"%";
+        }
+
+        async function salvarOffline() { 
+            if(!imagensAtuais.length) { updateStatus("⚠️ NENHUMA IMAGEM PARA SALVAR", true); return; }
+            let urlParaIdentificar = document.getElementById('urlInput').value;
+            let capMatch = urlParaIdentificar.match(/capitulo-(\d+)/);
+            let nomeId = tituloAtual.split(' - Cap')[0];
+            nomeId += capMatch ? " - Cap " + capMatch[1] : " - Offline";
+            updateStatus("💾 SALVANDO OFFLINE: " + nomeId, true); 
+            document.getElementById('progress-wrapper').style.display = 'block';
+            document.getElementById('progress-text').style.display = 'block';
+            const blobs = []; 
+            for(let i=0; i < imagensAtuais.length; i++) { 
+                try { 
+                    const r = await fetch(PROXY + encodeURIComponent(imagensAtuais[i]));
+                    if (!r.ok) throw new Error();
+                    const blob = await r.blob();
+                    blobs.push(blob); 
+                    updateProgress(i + 1, imagensAtuais.length);
+                } catch(e) { console.error("Erro ao baixar imagem " + i); } 
+            } 
+			if (blobs.length > 0) {
+				const transaction = db.transaction("mangas", "readwrite");
+				const store = transaction.objectStore("mangas");
+				store.put({ id: nomeId, imgs: blobs, url: urlParaIdentificar });
+        
+				transaction.oncomplete = () => { 
+					updateStatus("✅ SALVO: " + nomeId, true);
+					setTimeout(() => {
+						document.getElementById('progress-wrapper').style.display = 'none';
+						document.getElementById('progress-text').style.display = 'none';
+					}, 2000); 
+				};
+			} else { 
+				updateStatus("❌ ERRO AO SALVAR IMAGENS", true); 
+				document.getElementById('progress-wrapper').style.display = 'none';
+				document.getElementById('progress-text').style.display = 'none';
+			}
+		}
+
+        function lerOff(id) { 
+            db.transaction("mangas").objectStore("mangas").get(id).onsuccess = e => { 
+                const resultado = e.target.result;
+                if (resultado) {
+                    imagensAtuais = resultado.imgs.map(b => URL.createObjectURL(b));
+                    tituloAtual = id.split(' - Cap')[0];
+                    if (resultado.url) document.getElementById('urlInput').value = resultado.url;
+                    renderizar();
+                    fecharModal();
+                    updateStatus("📂 LENDO OFFLINE: " + id, true);
+                }
+            }; 
+        }
+
+        function renderOffline() { 
+            if(!db) return; 
+            const lista = document.getElementById('lista-off');
+            db.transaction("mangas").objectStore("mangas").getAll().onsuccess = e => { 
+                const itens = e.target.result;
+                lista.innerHTML = itens.length ? itens.map(i => `<div class="list-item"><span class="list-text" onclick="lerOff('${i.id}')">📂 ${i.id}</span><button class="btn-del" onclick="removerOffline('${i.id}')">✕</button></div>`).join('') : '<p style="text-align:center">Nenhum mangá offline</p>'; 
+            }; 
+        }
+
+        function removerOffline(id) {
+            if(confirm("Eliminar capítulo offline?")) {
+                db.transaction("mangas", "readwrite").objectStore("mangas").delete(id).onsuccess = () => {
+                    renderOffline();
+                    updateStatus("🗑️ ELIMINADO", true);
+                };
+            }
+        }
+
+        let registroCapitulos = JSON.parse(localStorage.getItem('cronos_last_caps')) || {};
+        const wait = (ms) => new Promise(res => setTimeout(res, ms));
+
+        function renderUpdates() {
+            const lista = document.getElementById('lista-updates');
+            const favs = JSON.parse(localStorage.getItem('favs_cronos') || '[]');
+            const nomesUnicos = [...new Set(favs.map(f => f.t.split(' - Cap')[0].trim()))];
+            
+            lista.innerHTML = nomesUnicos.length ? nomesUnicos.map(nome => {
+                const dados = registroCapitulos[nome] || { ultimo: "Pendente" };
+                const nomeEscapado = nome.replace(/'/g, "\\'");
+                return `
+                    <div class="list-item" style="border-left: 3px solid var(--gold)">
+                        <div style="display:flex; flex-direction:column; flex:1" onclick="abrirListaCompleta('${nomeEscapado}')">
+                            <span class="list-text" style="font-weight:bold; cursor:pointer">${nome} 📋</span>
+                            <span style="font-size:10px; color:var(--gold)">Visto até: ${dados.ultimo || "Pendente"}</span>
+                        </div>
+                        <button class="menu-btn" style="width:auto; margin:0; padding:8px 15px; background:var(--gold); color:#000" 
+                                onclick="verificarNovoCap('${nomeEscapado}')">🔍</button>
+                    </div>`;
+            }).join('') : '<p style="text-align:center">Adicione mangás aos favoritos primeiro.</p>';
+        }
+
+        async function atualizarTodosSequencial() {
+            const favs = JSON.parse(localStorage.getItem('favs_cronos') || '[]');
+            const nomesUnicos = [...new Set(favs.map(f => f.t.split(' - Cap')[0].trim()))];
+            if (nomesUnicos.length === 0) { alert("Adicione favoritos primeiro!"); return; }
+            updateStatus("🚀 INICIANDO FILA DE ATUALIZAÇÃO...", true);
+            for (const nome of nomesUnicos) {
+                updateStatus(`⏳ Atualizando: ${nome}`, true);
+                await verificarNovoCap(nome, true); 
+                await wait(500); 
+            }
+            updateStatus("✅ BIBLIOTECA ATUALIZADA!", true);
+            alert("Todos os mangás da lista foram verificados com sucesso.", "CONCLUÍDO");
+        }
+
+        async function verificarNovoCap(nome, emFila = false) {
+            const favs = JSON.parse(localStorage.getItem('favs_cronos') || '[]');
+            const dadosManga = favs.find(f => f.t.startsWith(nome));
+            if (!dadosManga) return;
+            if (!registroCapitulos[nome]) { registroCapitulos[nome] = { ultimo: 0, links: [] }; }
+            let capAtual = registroCapitulos[nome].ultimo || parseInt(dadosManga.u.match(/capitulo-(\d+)/)?.[1] || 1);
+            let nomeLimpo = limparNome(nome);
+            let continuar = true;
+            while (continuar) {
+                let proximo = capAtual + 1;
+                let achouNesseNumero = false;
+                const capSemZero = proximo.toString();
+                const capComZero = proximo < 10 ? '0' + proximo : proximo.toString();
+                let urlsParaTestar = [
+                    `https://mugiwarasoficial.com/manga/${nomeLimpo}/capitulo-${capSemZero}`,
+                    `https://mugiwarasoficial.com/manga/${nomeLimpo}/capitulo-${capComZero}`,
+                    `https://mangalivre.to/manga/${nomeLimpo}/capitulo-${capSemZero}`,
+                    `https://mangalivre.to/manga/${nomeLimpo}/capitulo-${capComZero}`
+                ];
+                for (let urlTeste of urlsParaTestar) {
+                    await wait(600);
+                    try {
+                        const res = await fetch(PROXY + encodeURIComponent(urlTeste));
+                        const html = await res.text();
+                        const doc = new DOMParser().parseFromString(html, "text/html");
+                        const imgs = Array.from(doc.querySelectorAll('img')).map(i => i.getAttribute('data-src') || i.getAttribute('src')).filter(s => s && s.includes('http') && !/logo|banner|discord|acesse|zap|removebg|75x106.webp|perfil/i.test(s));
+                        if (imgs.length > 3) {
+                            capAtual = proximo;
+                            achouNesseNumero = true;
+                            if (!registroCapitulos[nome].links.some(l => l.cap === capAtual)) {
+                                registroCapitulos[nome].links.push({ cap: capAtual, url: urlTeste });
+                            }
+                            updateStatus(`✨ ${nome}: Cap ${capAtual} ok!`, true);
+                            break;
+                        }
+                    } catch (e) {}
+                }
+                if (!achouNesseNumero) { continuar = false; }
+            }
+            registroCapitulos[nome].ultimo = capAtual;
+            localStorage.setItem('cronos_last_caps', JSON.stringify(registroCapitulos));
+            renderUpdates();
+            if (!emFila) { alert(`Busca concluída para ${nome}!\nParou no capítulo: ${capAtual}`, "🔍 ATUALIZAÇÃO"); }
+            return true;
+        }
+
+        function abrirListaCompleta(nome) {
+            const dados = registroCapitulos[nome];
+            if (!dados || !dados.links || dados.links.length === 0) { alert("Sem capítulos salvos. Clique na lupa 🔍 primeiro."); return; }
+            const container = document.getElementById('corpo-lista-caps');
+            document.getElementById('titulo-lista-caps').innerText = nome;
+            container.innerHTML = dados.links.sort((a, b) => b.cap - a.cap).map(item => `<div class="list-item"><span class="list-text" onclick="buscar('${item.url}'); fecharModal();">📖 Capítulo ${item.cap}</span></div>`).join('');
+            fecharModal();
+            abrirModal('modal-lista-caps');
+        }
+
+        window.alert = function(mensagem, titulo = "AVISO") {
+            document.getElementById('alert-title').innerText = titulo;
+            document.getElementById('alert-message').innerText = mensagem;
+            abrirModal('modal-alert');
+        };
+
+        function exportarDados() {
+            const backup = { favoritos: JSON.parse(localStorage.getItem('favs_cronos') || '[]'), registro: JSON.parse(localStorage.getItem('cronos_last_caps') || '{}') };
+            if (backup.favoritos.length === 0 && Object.keys(backup.registro).length === 0) { alert("Não há dados para exportar."); return; }
+            const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+            saveAs(blob, "cronos_ultra_backup.json");
+            updateStatus("✅ BACKUP EXPORTADO", true);
+        }
+
+        function importarDados() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.readAsText(file, "UTF-8");
+                reader.onload = readerEvent => {
+                    try {
+                        const dados = JSON.parse(readerEvent.target.result);
+                        if (dados.favoritos && Array.isArray(dados.favoritos)) {
+                            let favsAtuais = JSON.parse(localStorage.getItem('favs_cronos') || '[]');
+                            dados.favoritos.forEach(novo => { if (!favsAtuais.find(f => f.u === novo.u)) { favsAtuais.push(novo); } });
+                            localStorage.setItem('favs_cronos', JSON.stringify(favsAtuais));
+                        }
+                        if (dados.registro) {
+                            let registroAtual = JSON.parse(localStorage.getItem('cronos_last_caps') || '{}');
+                            for (let manga in dados.registro) { if (!registroAtual[manga] || dados.registro[manga].ultimo > registroAtual[manga].ultimo) { registroAtual[manga] = dados.registro[manga]; } }
+                            localStorage.setItem('cronos_last_caps', JSON.stringify(registroAtual));
+                            registroCapitulos = registroAtual;
+                        }
+                        alert("Backup restaurado!");
+                        renderFavs();
+                        renderUpdates();
+                    } catch (err) { alert("Erro ao ler backup."); }
+                };
+            };
+            input.click();
+        }
+    </script>
+</body>
+</html>
