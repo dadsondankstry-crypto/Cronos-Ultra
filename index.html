@@ -373,7 +373,7 @@
                 const res = await fetch(PROXY + encodeURIComponent(url));
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, "text/html");
-                const imgs = Array.from(doc.querySelectorAll('img')).map(i => i.getAttribute('data-src') || i.getAttribute('src')).filter(s => s && s.includes('http') && !/logo|banner|discord|acesse|zap|removebg|75x106.webp|perfil/i.test(s));
+                const imgs = Array.from(doc.querySelectorAll('img')).map(i => i.getAttribute('data-src') || i.getAttribute('src')).filter(s => s && s.includes('http') && !/logo|banner|discord|acesse|zap|removebg|75x106|perfil/i.test(s));
                 
                 if(imgs.length > 3) {
                     cacheData[url] = imgs; 
@@ -995,4 +995,5 @@ window.addEventListener('appinstalled', () => {
 });
 	</script>
 </body>
+
 </html>
