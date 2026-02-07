@@ -1,7 +1,7 @@
 {
-  "name": "Cronos Ultra Reader",
+  "name": "Cronos Ultra",
   "short_name": "Cronos",
-  "description": "Leitor de Mangás e Manhwas Offline",
+  "description": "Leitor de Mangás e Manhwas Otimizado",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0a0a",
@@ -12,12 +12,13 @@
       "src": "https://cdn-icons-png.flaticon.com/512/7406/7406914.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/7406/7406914.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
