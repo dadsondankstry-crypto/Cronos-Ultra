@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Cronos Ultra - v1.7 Final </title>
     
-    <link rel="manifest" href="manifest.json">
+	<link rel="manifest" href="manifest.json">
+	<link rel="icon" type="image/png" href="favicon.png">
+	<link rel="apple-touch-icon" href="icon-512.png">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-	<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/7406/7406914.png">
-
-    <meta name="theme-color" content="#d4af37">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="theme-color" content="#d4af37">
+	<meta name="apple-mobile-web-app-capable" content="yes">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -159,7 +159,9 @@
         <h3>⚙ CONFIGURAÇÕES</h3>
         <button class="menu-btn" onclick="fecharModal(); abrirModal('modal-src')">Escolher Fonte <span>📡</span></button>
         <button class="menu-btn" onclick="toggleMode()" id="modeBtnTextConfig">Modo: Manhwa (Scroll) <span>📜</span></button>
-        <button class="menu-btn" onclick="ativarModoCinema()">Modo Cinema <span>⛶</span></button>
+        <button class="menu-btn" onclick="ativarModoCinema()">Modo Cinema <span>⛶
+		
+		</span></button>
         <button class="menu-btn" onclick="fecharModal(); renderUpdates(); abrirModal('modal-updates')" style="background: #1e3a8a;">Verificar Atualizações <span>🔄</span></button>
         
         <hr style="border-color:#333">
@@ -878,7 +880,6 @@ async function verificarCapAnterior(nome) {
         registroCapitulos[nome] = { ultimo: 0, links: [] };
     }
 
-    // Pega o menor capítulo que você já tem registrado para começar a descer a partir dele
     let menorCapRegistrado = 9999;
     if (registroCapitulos[nome].links && registroCapitulos[nome].links.length > 0) {
         menorCapRegistrado = Math.min(...registroCapitulos[nome].links.map(l => l.cap));
@@ -889,48 +890,59 @@ async function verificarCapAnterior(nome) {
     let capAtual = menorCapRegistrado;
     let nomeLimpo = limparNome(nome);
     let continuar = true;
+    let capsEncontradosNestaRodada = 0;
 
-    while (continuar && capAtual > 1) {
-        let anterior = capAtual - 1;
-        let achouNesseNumero = false;
+    while (continuar && capAtual > 1 && capsEncontradosNestaRodada < 25) {
+        let achouNesseBloco = false;
         
-        const capSemZero = anterior.toString();
-        const capComZero = anterior < 10 ? '0' + anterior : anterior.toString();
-        
-        let urlsParaTestar = [
-            `https://mugiwarasoficial.com/manga/${nomeLimpo}/capitulo-${capSemZero}`,
-            `https://mugiwarasoficial.com/manga/${nomeLimpo}/capitulo-${capComZero}`,
-            `https://mangalivre.to/manga/${nomeLimpo}/capitulo-${capSemZero}`,
-            `https://mangalivre.to/manga/${nomeLimpo}/capitulo-${capComZero}`
-        ];
+        // Tenta olhar até 3 capítulos para trás caso haja um "buraco" (ex: 335 -> pula 334 -> acha 333)
+        for (let offset = 1; offset <= 3; offset++) {
+            let anterior = capAtual - offset;
+            if (anterior < 1) break;
 
-        for (let urlTeste of urlsParaTestar) {
-            await wait(600); 
-            try {
-                const res = await fetch(PROXY + encodeURIComponent(urlTeste));
-                const html = await res.text();
-                const doc = new DOMParser().parseFromString(html, "text/html");
-                
-                const imgs = Array.from(doc.querySelectorAll('img'))
-                    .map(i => i.getAttribute('data-src') || i.getAttribute('src'))
-                    .filter(s => s && s.includes('http') && !/logo|banner|discord|acesse|zap|removebg|75x106.webp|perfil/i.test(s));
-                
-                if (imgs.length > 3) {
-                    capAtual = anterior;
-                    achouNesseNumero = true;
+            let achouNoLink = false;
+            const capSemZero = anterior.toString();
+            const capComZero = anterior < 10 ? '0' + anterior : anterior.toString();
+            
+            let urlsParaTestar = [
+                `https://mugiwarasoficial.com/manga/${nomeLimpo}/capitulo-${capSemZero}`,
+                `https://mugiwarasoficial.com/manga/${nomeLimpo}/capitulo-${capComZero}`,
+                `https://mangalivre.to/manga/${nomeLimpo}/capitulo-${capSemZero}`,
+                `https://mangalivre.to/manga/${nomeLimpo}/capitulo-${capComZero}`
+            ];
 
-                    if (!registroCapitulos[nome].links.some(l => l.cap === capAtual)) {
-                        registroCapitulos[nome].links.push({ cap: capAtual, url: urlTeste });
-                    }
+            for (let urlTeste of urlsParaTestar) {
+                await wait(600); 
+                try {
+                    const res = await fetch(PROXY + encodeURIComponent(urlTeste));
+                    const html = await res.text();
+                    const doc = new DOMParser().parseFromString(html, "text/html");
                     
-                    updateStatus(`✨ ${nome}: Cap ${capAtual} achado!`, true);
-                    break;
-                }
-            } catch (e) { console.error("Erro na busca reversa"); }
+                    const imgs = Array.from(doc.querySelectorAll('img'))
+                        .map(i => i.getAttribute('data-src') || i.getAttribute('src'))
+                        .filter(s => s && s.includes('http') && !/logo|banner|discord|acesse|zap|removebg|75x106.webp|perfil/i.test(s));
+                    
+                    if (imgs.length > 3) {
+                        capAtual = anterior; // Atualiza o ponto de referência para o próximo loop
+                        achouNesseBloco = true;
+                        achouNoLink = true;
+                        capsEncontradosNestaRodada++;
+
+                        if (!registroCapitulos[nome].links.some(l => l.cap === capAtual)) {
+                            registroCapitulos[nome].links.push({ cap: capAtual, url: urlTeste });
+                        }
+                        
+                        updateStatus(`✨ ${nome}: Cap ${capAtual} achado! (${capsEncontradosNestaRodada}/25)`, true);
+                        break; 
+                    }
+                } catch (e) { console.error("Erro na busca reversa"); }
+            }
+
+            if (achouNoLink) break; // Sai do loop de offset e volta para o while principal
         }
 
-        if (!achouNesseNumero) {
-            continuar = false; // Para quando não encontrar o capítulo anterior
+        if (!achouNesseBloco) {
+            continuar = false; // Se testou 3 números para trás e nenhum deu certo, para tudo.
         }
     }
 
